@@ -11,7 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Perbaikan: Gunakan sintaks uri() yang lebih standar untuk Kotlin DSL
+        // Menggunakan sintaks uri() yang direkomendasikan untuk Kotlin DSL
         maven { url = uri("https://www.jitpack.io") }
     }
 }
