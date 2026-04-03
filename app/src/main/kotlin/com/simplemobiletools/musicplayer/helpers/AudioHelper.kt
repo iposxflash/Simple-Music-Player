@@ -19,222 +19,129 @@ class AudioHelper(private val context: Context) {
     }
 
     fun getTrack(mediaStoreId: Long): Track? {
-        return context.tracksDAO.getTrackWithMediaStoreId(mediaStoreId)
+        // Karena kita bypass database, kita cari manual di daftar assets
+        return getAllTracks().firstOrNull { it.mediaStoreId == mediaStoreId }
     }
 
+    // --- PERBAIKAN UTAMA: MEMBACA DARI ASSETS ---
     fun getAllTracks(): ArrayList<Track> {
-        val tracks = context.tracksDAO.getAll()
-            .applyProperFilenames(config.showFilename)
+        val tracks = ArrayList<Track>()
+        val assetManager = context.assets
+        
+        try {
+            // Membaca file langsung dari folder assets
+            val files = assetManager.list("") ?: return tracks
+            var idCounter = 1L
+            
+            for (filename in files) {
+                // Filter hanya file audio yang didukung
+                if (filename.endsWith(".mp3", true) || 
+                    filename.endsWith(".flac", true) || 
+                    filename.endsWith(".m4a", true)) {
+                    
+                    val track = Track(
+                        id = idCounter, 
+                        mediaStoreId = idCounter, 
+                        title = filename.substringBeforeLast("."), 
+                        artist = "Internal Music", 
+                        path = "asset:///$filename", // Path khusus untuk ExoPlayer
+                        duration = 0, 
+                        album = "App Bundle", 
+                        artistId = 1L, 
+                        albumId = 1L, 
+                        trackId = idCounter.toInt(), 
+                        folderName = "Assets"
+                    )
+                    tracks.add(track)
+                    idCounter++
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         tracks.sortSafely(config.trackSorting)
         return tracks
     }
 
     fun getAllFolders(): ArrayList<Folder> {
-        val tracks = context.audioHelper.getAllTracks()
-        val foldersMap = tracks.groupBy { it.folderName }
+        // Karena semua ada di assets, kita kembalikan satu folder virtual saja
         val folders = ArrayList<Folder>()
-        val excludedFolders = config.excludedFolders
-        for ((title, folderTracks) in foldersMap) {
-            val path = (folderTracks.firstOrNull()?.path?.getParentPath() ?: "").removeSuffix("/")
-            if (excludedFolders.contains(path)) {
-                continue
-            }
-
-            val folder = Folder(title, folderTracks.size, path)
-            folders.add(folder)
-        }
-
-        folders.sortSafely(config.folderSorting)
+        folders.add(Folder("Assets", getAllTracks().size, "internal/assets"))
         return folders
     }
 
     fun getFolderTracks(folder: String): ArrayList<Track> {
-        val tracks = context.tracksDAO.getTracksFromFolder(folder)
-            .applyProperFilenames(config.showFilename)
-
-        tracks.sortSafely(config.getProperFolderSorting(folder))
-        return tracks
+        return getAllTracks()
     }
 
     fun updateTrackInfo(newPath: String, artist: String, title: String, oldPath: String) {
-        context.tracksDAO.updateSongInfo(newPath, artist, title, oldPath)
+        // Non-aktifkan karena file assets bersifat read-only
     }
 
     fun deleteTrack(mediaStoreId: Long) {
-        context.tracksDAO.removeTrack(mediaStoreId)
+        // Non-aktifkan karena file assets tidak bisa dihapus dari dalam APK
     }
 
-    fun deleteTracks(tracks: List<Track>) {
-        tracks.forEach {
-            deleteTrack(it.mediaStoreId)
-        }
-    }
+    fun deleteTracks(tracks: List<Track>) {}
 
-    fun insertArtists(artists: List<Artist>) {
-        context.artistDAO.insertAll(artists)
-    }
+    fun insertArtists(artists: List<Artist>) {}
 
     fun getAllArtists(): ArrayList<Artist> {
-        val artists = context.artistDAO.getAll() as ArrayList<Artist>
-        artists.sortSafely(config.artistSorting)
-        return artists
+        val artist = Artist(1L, "Internal Artist", getAllTracks().size, getAllTracks().size)
+        return arrayListOf(artist)
     }
 
     fun getArtistAlbums(artistId: Long): ArrayList<Album> {
-        return context.albumsDAO.getArtistAlbums(artistId) as ArrayList<Album>
+        val album = Album(1L, "App Bundle", "Internal Artist", getAllTracks().size, 2024, "", 1L)
+        return arrayListOf(album)
     }
 
     fun getArtistAlbums(artists: List<Artist>): ArrayList<Album> {
-        return artists.flatMap { getArtistAlbums(it.id) } as ArrayList<Album>
+        return getArtistAlbums(1L)
     }
 
     fun getArtistTracks(artistId: Long): ArrayList<Track> {
-        return context.tracksDAO.getTracksFromArtist(artistId)
-            .applyProperFilenames(config.showFilename)
+        return getAllTracks()
     }
 
     fun getArtistTracks(artists: List<Artist>): ArrayList<Track> {
-        return getAlbumTracks(
-            albums = getArtistAlbums(artists)
-        )
+        return getAllTracks()
     }
 
-    fun deleteArtist(id: Long) {
-        context.artistDAO.deleteArtist(id)
-    }
+    fun deleteArtist(id: Long) {}
 
-    fun deleteArtists(artists: List<Artist>) {
-        artists.forEach {
-            deleteArtist(it.id)
-        }
-    }
+    fun deleteArtists(artists: List<Artist>) {}
 
-    fun insertAlbums(albums: List<Album>) {
-        context.albumsDAO.insertAll(albums)
-    }
+    fun insertAlbums(albums: List<Album>) {}
 
     fun getAlbum(albumId: Long): Album? {
-        return context.albumsDAO.getAlbumWithId(albumId)
+        return Album(1L, "App Bundle", "Internal Artist", getAllTracks().size, 2024, "", 1L)
     }
 
     fun getAllAlbums(): ArrayList<Album> {
-        val albums = context.albumsDAO.getAll() as ArrayList<Album>
-        albums.sortSafely(config.albumSorting)
-        return albums
+        return getArtistAlbums(1L)
     }
 
     fun getAlbumTracks(albumId: Long): ArrayList<Track> {
-        val tracks = context.tracksDAO.getTracksFromAlbum(albumId)
-            .applyProperFilenames(config.showFilename)
-        tracks.sortWith(compareBy({ it.trackId }, { it.title.lowercase() }))
-        return tracks
+        return getAllTracks()
     }
 
     fun getAlbumTracks(albums: List<Album>): ArrayList<Track> {
-        return albums.flatMap { getAlbumTracks(it.id) }
-            .applyProperFilenames(config.showFilename)
-    }
-
-    private fun deleteAlbum(id: Long) {
-        context.albumsDAO.deleteAlbum(id)
-    }
-
-    fun deleteAlbums(albums: List<Album>) {
-        albums.forEach {
-            deleteAlbum(it.id)
-        }
-    }
-
-    fun insertPlaylist(playlist: Playlist): Long {
-        return context.playlistDAO.insert(playlist)
-    }
-
-    fun updatePlaylist(playlist: Playlist) {
-        context.playlistDAO.update(playlist)
+        return getAllTracks()
     }
 
     fun getAllPlaylists(): ArrayList<Playlist> {
-        return context.playlistDAO.getAll() as ArrayList<Playlist>
+        return ArrayList()
     }
 
     fun getAllGenres(): ArrayList<Genre> {
-        val genres = context.genresDAO.getAll() as ArrayList<Genre>
-        genres.sortSafely(config.genreSorting)
-        return genres
-    }
-
-    fun getGenreTracks(genreId: Long): ArrayList<Track> {
-        val tracks = context.tracksDAO.getGenreTracks(genreId)
-            .applyProperFilenames(config.showFilename)
-
-        tracks.sortSafely(config.trackSorting)
-        return tracks
-    }
-
-    fun getGenreTracks(genres: List<Genre>): ArrayList<Track> {
-        val tracks = genres.flatMap { context.tracksDAO.getGenreTracks(it.id) }
-            .applyProperFilenames(config.showFilename)
-
-        tracks.sortSafely(config.trackSorting)
-        return tracks
-    }
-
-    private fun deleteGenre(id: Long) {
-        context.genresDAO.deleteGenre(id)
-    }
-
-    fun deleteGenres(genres: List<Genre>) {
-        genres.forEach {
-            deleteGenre(it.id)
-        }
-    }
-
-    fun insertGenres(genres: List<Genre>) {
-        genres.forEach {
-            context.genresDAO.insert(it)
-        }
-    }
-
-    fun getPlaylistTracks(playlistId: Int): ArrayList<Track> {
-        val tracks = context.tracksDAO.getTracksFromPlaylist(playlistId)
-            .applyProperFilenames(config.showFilename)
-
-        tracks.sortSafely(config.getProperPlaylistSorting(playlistId))
-        return tracks
-    }
-
-    fun getPlaylistTrackCount(playlistId: Int): Int {
-        return context.tracksDAO.getTracksCountFromPlaylist(playlistId)
-    }
-
-    fun updateOrderInPlaylist(playlistId: Int, trackId: Long) {
-        context.tracksDAO.updateOrderInPlaylist(playlistId, trackId)
-    }
-
-    fun deletePlaylists(playlists: ArrayList<Playlist>) {
-        context.playlistDAO.deletePlaylists(playlists)
-        playlists.forEach {
-            context.tracksDAO.removePlaylistSongs(it.id)
-        }
-    }
-
-    fun removeInvalidAlbumsArtists() {
-        val tracks = context.tracksDAO.getAll()
-        val albums = context.albumsDAO.getAll()
-        val artists = context.artistDAO.getAll()
-
-        val invalidAlbums = albums.filter { album -> tracks.none { it.albumId == album.id } }
-        deleteAlbums(invalidAlbums)
-
-        val invalidArtists = artists.filter { artist -> tracks.none { it.artistId == artist.id } }
-        deleteArtists(invalidArtists)
+        return ArrayList()
     }
 
     fun getQueuedTracks(queueItems: List<QueueItem> = context.queueDAO.getAll()): ArrayList<Track> {
         val allTracks = getAllTracks().associateBy { it.mediaStoreId }
 
-        // make sure we fetch the songs in the order they were displayed in
         val tracks = queueItems.mapNotNull { queueItem ->
             val track = allTracks[queueItem.trackId]
             if (track != null) {
@@ -247,40 +154,26 @@ class AudioHelper(private val context: Context) {
             }
         }
 
-        return tracks as ArrayList<Track>
+        return if (tracks.isEmpty()) getAllTracks() else tracks as ArrayList<Track>
     }
 
-    /**
-     * Executes [callback] with current track as quickly as possible and then proceeds to load the complete queue with all tracks.
-     */
     fun getQueuedTracksLazily(callback: (tracks: List<Track>, startIndex: Int, startPositionMs: Long) -> Unit) {
         ensureBackgroundThread {
-            var queueItems = context.queueDAO.getAll()
-            if (queueItems.isEmpty()) {
-                initQueue()
-                queueItems = context.queueDAO.getAll()
+            val allTracks = getAllTracks()
+            if (allTracks.isEmpty()) {
+                callback(emptyList(), 0, 0)
+                return@ensureBackgroundThread
             }
 
             val currentItem = context.queueDAO.getCurrent()
-            if (currentItem == null) {
-                callback(emptyList(), 0, 0)
-                return@ensureBackgroundThread
-            }
+            val startPositionMs = currentItem?.lastPosition?.seconds?.inWholeMilliseconds ?: 0
+            
+            // Cari index lagu saat ini
+            val currentIndex = if (currentItem != null) {
+                allTracks.indexOfFirstOrNull { it.mediaStoreId == currentItem.trackId } ?: 0
+            } else 0
 
-            val currentTrack = getTrack(currentItem.trackId)
-            if (currentTrack == null) {
-                callback(emptyList(), 0, 0)
-                return@ensureBackgroundThread
-            }
-
-            // immediately return the current track.
-            val startPositionMs = currentItem.lastPosition.seconds.inWholeMilliseconds
-            callback(listOf(currentTrack), 0, startPositionMs)
-
-            // return the rest of the queued tracks.
-            val queuedTracks = getQueuedTracks(queueItems)
-            val currentIndex = queuedTracks.indexOfFirstOrNull { it.mediaStoreId == currentTrack.mediaStoreId } ?: 0
-            callback(queuedTracks, currentIndex, startPositionMs)
+            callback(allTracks, currentIndex, startPositionMs)
         }
     }
 
@@ -307,6 +200,5 @@ class AudioHelper(private val context: Context) {
 }
 
 private fun Collection<Track>.applyProperFilenames(showFilename: Int): ArrayList<Track> {
-    return distinctBy { "${it.path}/${it.mediaStoreId}" }
-        .onEach { it.title = it.getProperTitle(showFilename) } as ArrayList<Track>
+    return this as ArrayList<Track>
 }
