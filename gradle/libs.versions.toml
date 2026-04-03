@@ -2,7 +2,6 @@
 #jetbrains
 autofittextview = "0.2.1"
 desugar_jdk_libs = "2.0.3"
-# higher versions of jaudiotagger not compatible with <= API 25 devices
 jaudiotagger = "2.2.5"
 kotlin = "1.9.10"
 #KSP
@@ -20,9 +19,9 @@ media = "1.6.0"
 media3 = "1.1.1"
 room = "2.5.2"
 
-# --- PERBAIKAN DI SINI ---
-# Menggunakan versi rilis stabil alih-alih commit hash
-simple-commons = "8.3.1" 
+# --- PERBAIKAN FINAL ---
+# Mencoba versi 8.0.1 yang lebih umum tersedia di JitPack
+simple-commons = "8.0.1" 
 # -------------------------
 
 #Gradle
